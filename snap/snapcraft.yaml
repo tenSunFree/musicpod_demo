@@ -1,0 +1,223 @@
+name: musicpod
+title: MusicPod
+version: git
+summary: Music, podcast and internet radio player
+description: Play local audio files, browse podcasts online or listen to internet radio stations.
+website: https://github.com/ubuntu-flutter-community/musicpod
+contact: frederik.feichtmeier@gmail.com
+source-code: https://github.com/ubuntu-flutter-community/musicpod
+icon: snap/gui/musicpod.png
+
+confinement: strict
+base: core22
+grade: stable
+license: MPL-2.0
+
+architectures:
+  - build-on: amd64
+  - build-on: arm64
+
+environment:
+  LD_LIBRARY_PATH: $LD_LIBRARY_PATH:$SNAP/gnome-platform/usr/lib/$CRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/blas:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/lapack:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/caca:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/vdpau:$SNAP/usr/lib/$CRAFT_ARCH_TRIPLET/mfx
+
+apps:
+  musicpod:
+    command: bin/musicpod
+    extensions: [gnome]
+    plugs:
+      - network
+      - audio-playback
+      - network-manager-observe
+      - home
+      - removable-media
+    slots:
+      - mpris
+
+slots:
+  dbus-musicpod:
+    interface: dbus
+    bus: session
+    name: org.feichtmeier.Musicpod
+
+parts:
+  mpv:
+    source: https://github.com/mpv-player/mpv.git
+    source-tag: 'v0.36.0'
+    plugin: meson
+    meson-parameters:
+      - --prefix=/usr
+      - --buildtype=release
+      - -Dlibmpv=true
+    build-packages:
+      - curl
+      - libavcodec-dev
+      - libavfilter-dev
+      - libass-dev
+      - libx264-dev
+      - libvorbis-dev
+      - libjpeg-turbo8-dev
+    prime:
+      - usr/lib/*/libmpv*
+
+  flutter-git:
+    source: https://github.com/flutter/flutter.git
+    source-tag: 3.27.3
+    source-depth: 1
+    plugin: nil
+    override-build: |
+      mkdir -p $CRAFT_PART_INSTALL/usr/bin
+      mkdir -p $CRAFT_PART_INSTALL/usr/libexec
+      cp -r $CRAFT_PART_SRC $CRAFT_PART_INSTALL/usr/libexec/flutter
+      ln -s $CRAFT_PART_INSTALL/usr/libexec/flutter/bin/flutter $CRAFT_PART_INSTALL/usr/bin/flutter
+      ln -s $SNAPCRAFT_PART_INSTALL/usr/libexec/flutter/bin/dart $SNAPCRAFT_PART_INSTALL/usr/bin/dart
+      $CRAFT_PART_INSTALL/usr/bin/flutter doctor
+    build-packages:
+      - clang
+      - cmake
+      - curl
+      - libgtk-3-dev
+      - ninja-build
+      - unzip
+      - xz-utils
+      - zip
+    override-prime: ''
+
+  musicpod:
+    after: [flutter-git, mpv]
+    source: .
+    source-type: git
+    plugin: nil
+    build-environment:
+      - LD_LIBRARY_PATH: $SNAPCRAFT_STAGE/usr/lib/$CRAFT_ARCH_TRIPLET:/snap/gnome-42-2204-sdk/current/lib/$CRAFT_ARCH_TRIPLET:/snap/gnome-42-2204-sdk/current/usr/lib/$CRAFT_ARCH_TRIPLET:/snap/gnome-42-2204-sdk/current/usr/lib:/snap/gnome-42-2204-sdk/current/usr/lib/vala-current:/snap/gnome-42-2204-sdk/current/usr/lib/$CRAFT_ARCH_TRIPLET/pulseaudio${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+    override-build: |
+      set -eux
+      curl https://sh.rustup.rs -sSf | sh -s -- -y
+      mkdir -p $CRAFT_PART_INSTALL/bin/lib
+      # work around pub get stack overflow # https://github.com/dart-lang/sdk/issues/51068#issuecomment-1396588253
+      set +e
+      dart pub get
+      flutter build linux --release -v
+      cp -r build/linux/*/release/bundle/* $CRAFT_PART_INSTALL/bin/
+
+  deps:
+    plugin: nil
+    stage-packages:
+      - libaom3
+      - libass9
+      - libblas3
+      - libbluray2
+      - libbs2b0
+      - libchromaprint1
+      - libcodec2-1.0
+      - libflite1
+      - libgme0
+      - libgsm1
+      - liblapack3
+      - liblilv-0-0
+      - libmysofa1
+      - libnorm1
+      - libnuma1
+      - libopenmpt0
+      - libpgm-5.3-0
+      - libpocketsphinx3
+      - librabbitmq4
+      - librubberband2
+      - libserd-0-0
+      - libshine3
+      - libsnappy1v5
+      - libsodium23
+      - libsord-0-0
+      - libsoxr0
+      - libsphinxbase3
+      - libsratom-0-0
+      - libssh-gcrypt-4
+      - libudfread0
+      - libva-drm2
+      - libva-x11-2
+      - libvdpau1
+      - libvidstab1.1
+      - libx265-199
+      - libxvidcore4
+      - libzimg2
+      - libzmq5
+      - libzvbi0
+      - libavfilter7
+      - libavformat58
+      - libpostproc55
+      - libswscale5
+      - libsrt1.4-gnutls
+      - ocl-icd-libopencl1
+      - on amd64:
+        - libmfx1
+    prime:
+      - usr/lib/*/blas/libblas.so*
+      - usr/lib/*/lapack/liblapack.so*
+      - usr/lib/*/libaom.so*
+      - usr/lib/*/libass.so*
+      - usr/lib/*/libbluray.so*
+      - usr/lib/*/libbs2b.so*
+      - usr/lib/*/libchromaprint.so*
+      - usr/lib/*/libcodec2.so*
+      - usr/lib/*/libflite_cmulex.so*
+      - usr/lib/*/libflite_cmu_us_awb.so*
+      - usr/lib/*/libflite_cmu_us_kal16.so*
+      - usr/lib/*/libflite_cmu_us_kal.so*
+      - usr/lib/*/libflite_cmu_us_rms.so*
+      - usr/lib/*/libflite_cmu_us_slt.so*
+      - usr/lib/*/libflite.so*
+      - usr/lib/*/libflite_usenglish.so*
+      - usr/lib/*/libgme.so*
+      - usr/lib/*/libgsm.so*
+      - usr/lib/*/liblilv-0.so*
+      - usr/lib/*/libmfx.so*
+      - usr/lib/*/libmysofa.so*
+      - usr/lib/*/libnorm.so*
+      - usr/lib/*/libnuma.so*
+      - usr/lib/*/libOpenCL.so*
+      - usr/lib/*/libopenmpt.so*
+      - usr/lib/*/libpgm-5.3.so*
+      - usr/lib/*/libpocketsphinx.so*
+      - usr/lib/*/librabbitmq.so*
+      - usr/lib/*/librubberband.so*
+      - usr/lib/*/libserd-0.so*
+      - usr/lib/*/libshine.so*
+      - usr/lib/*/libsnappy.so*
+      - usr/lib/*/libsodium.so*
+      - usr/lib/*/libsord-0.so*
+      - usr/lib/*/libsoxr.so*
+      - usr/lib/*/libsphinxbase.so*
+      - usr/lib/*/libsratom-0.so*
+      - usr/lib/*/libssh-gcrypt.so*
+      - usr/lib/*/libudfread.so*
+      - usr/lib/*/libva-drm.so*
+      - usr/lib/*/libva-x11.so*
+      - usr/lib/*/libvdpau.so*
+      - usr/lib/*/libvidstab.so*
+      - usr/lib/*/libx265.so*
+      - usr/lib/*/libxvidcore.so*
+      - usr/lib/*/libzimg.so*
+      - usr/lib/*/libzmq.so*
+      - usr/lib/*/libzvbi.so*
+      - usr/lib/*/libx264.so*
+      - usr/lib/*/libswscale.so*
+      - usr/lib/*/libavfilter.so*
+      - usr/lib/*/libavformat.so*
+      - usr/lib/*/libpostproc.so*
+      - usr/lib/*/libsrt*.so*
+      - usr/lib/*/libda*.so*
+      - usr/lib/*/libgfortran.so*
+      - usr/lib/*/libavcodec.so*
+      - usr/lib/*/libavutil.so*
+      - usr/lib/*/libswresample.so*
+
+  # Find files provided by the base and platform snap and ensure they aren't
+  # duplicated in this snap
+  cleanup:
+    after: [musicpod, deps]
+    plugin: nil
+    build-snaps: [core22, gtk-common-themes, gnome-42-2204]
+    override-prime: |
+      set -eux
+      for snap in "core22" "gtk-common-themes" "gnome-42-2204"; do
+        cd "/snap/$snap/current" && find . -type f,l -name *.so.* -exec rm -f "$CRAFT_PRIME/{}" \;
+      done
